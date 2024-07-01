@@ -2,10 +2,9 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for swiftformat.
-GH_REPO="https://github.com/nicklockwood/swiftformat"
+GH_REPO="https://github.com/nicklockwood/SwiftFormat"
 TOOL_NAME="swiftformat"
-TOOL_TEST="swiftformat --version"
+TOOL_TEST="swiftformat --help"
 
 fail() {
   echo -e "asdf-$TOOL_NAME: $*"
@@ -14,7 +13,6 @@ fail() {
 
 curl_opts=(-fsSL)
 
-# NOTE: You might want to remove this if swiftformat is not hosted on GitHub releases.
 if [ -n "${GITHUB_API_TOKEN:-}" ]; then
   curl_opts=("${curl_opts[@]}" -H "Authorization: token $GITHUB_API_TOKEN")
 fi
@@ -27,12 +25,10 @@ sort_versions() {
 list_github_tags() {
   git ls-remote --tags --refs "$GH_REPO" |
     grep -o 'refs/tags/.*' | cut -d/ -f3- |
-    sed 's/^v//' # NOTE: You might want to adapt this sed to remove non-version strings from tags
+    sed 's/^v//'
 }
 
 list_all_versions() {
-  # TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-  # Change this function if swiftformat has other means of determining installable versions.
   list_github_tags
 }
 
@@ -50,24 +46,26 @@ download_release() {
 install_version() {
   local install_type="$1"
   local version="$2"
-  local install_path="${3%/bin}/bin"
+  local install_path="$3"
 
   if [ "$install_type" != "version" ]; then
     fail "asdf-$TOOL_NAME supports release installs only"
   fi
 
+  local release_file="$install_path/$TOOL_NAME-$version.tar.gz"
   (
     mkdir -p "$install_path"
-    cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
+    download_release "$version" "$release_file"
+    unzip $release_file -d "${install_path}/bin" || fail "Could not extract $release_file"
+    rm "$release_file"
 
-    # TODO: Assert swiftformat executable exists.
     local tool_cmd
     tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
-    test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
+    test -x "$install_path/bin/$tool_cmd" || fail "Expected $install_path/bin/$tool_cmd to be executable."
 
     echo "$TOOL_NAME $version installation was successful!"
   ) || (
     rm -rf "$install_path"
-    fail "An error occurred while installing $TOOL_NAME $version."
+    fail "An error ocurred while installing $TOOL_NAME $version."
   )
 }
